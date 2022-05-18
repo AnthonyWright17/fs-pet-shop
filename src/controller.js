@@ -1,59 +1,57 @@
-const data = require('./pets.json');
-const fs = require('fs');
+const pool = require('../database/db');
+const queries = require('./queries');
 
-
-//All Pets
-const getAllPets = (req, res) =>{ 
-  res.status(200).json(data)
-};
-
-//A Pet
-const getAPet = (req, res) => {
-  const id = parseInt(req.params.id)
-  if(!data[id]){
-    res.status(404).json({"message": `No pet exists at index ${id}`})
-  } else {
-    res.status(200).json(data[id])
-  }
-}
-//Add Pet
-const addPet = (req, res) => {
-  const { age, kind, name } = req.body
-  // console.log(data, req.body)
-  data.push(req.body)
-  console.log(data)
-  fs.writeFileSync('./pets.json', JSON.stringify(data))
-  res.status(201).json(data)
-}
-
-//Remove A Pet
-const removePetById = (req, res) => {
-  const id = parseInt(req.params.id)
-  if(!data[id]) res.status(404).json({"message": `A pet does not exist at index ${id}`})
-  const filtered = data.filter(function(value, index, arr){
-    return index !== id
+const getAllPets = (req, res) =>{
+  pool.query(queries.getAllPets, (err, results) =>{
+    if (err) throw err;
+    res.status(200).json(results.rows)
   })
-  fs.writeFileSync('./pets.json', JSON.stringify(filtered))
-  res.status(200).json(filtered)
 }
 
-//Edit Pet
-const editPet = (req, res) =>{
+const getPetById = (req, res) =>{
   const id = parseInt(req.params.id)
-  const {age, kind, name} = req.body
-  for (key in Object.keys(data[id])){
-    if (Object.keys(data[id])[key] == Object.keys(req.body)){
-      data[id][Object.keys(data[id])[key]] = req.body
-      fs.writeFileSync('./pets.json', JSON.stringify(data))
-    }
-  }
-  res.status(200).json({"message": 'Pet updated!'})
+  pool.query(queries.getAPet, [id], (err, results) =>{
+    if (err) throw err;
+    res.status(200).json(results.rows)
+  })
 }
 
-module.exports ={
+const addPet = (req, res) => {
+  const { name, age, kind } = req.body;
+
+  pool.query(queries.addPet, [name, age, kind], (err, results) =>{
+    if (err) throw err; 
+    res.status(201).json({"message": "Pet added!"})
+  })
+}
+
+const removePet = (req, res) =>{
+  const id = parseInt(req.params.id)
+
+  pool.query(queries.deletePet, [id], (err, results) => {
+    if (err) throw err;
+    res.status(200).json({"message": `Pet deleted at ${id}`})
+  })
+}
+
+const updatePet = async (req, res) =>{
+  const id = parseInt(req.params.id)
+  let entityToUpdate = await pool.query(queries.getPetById, [id])
+  
+  const name = req.body.name || entityToUpdate.rows[0].name;
+  const age = req.body.age || entityToUpdate.rows[0].age;
+  const kind = req.body.kind || entityToUpdate.rows[0].kind;
+
+  pool.query(queries.updatePet, [id, name, age, kind], (err, results) => {
+    if (err) throw err;
+    res.status(200).json({"message":"Pet updated"})
+  })
+}
+
+module.exports = {
   getAllPets,
-  getAPet,
+  getPetById,
   addPet,
-  removePetById,
-  editPet
+  removePet,
+  updatePet
 }
